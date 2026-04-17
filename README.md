@@ -8,8 +8,9 @@ Current tool:
 
 Clipboard payload format:
 
-- `[RSA-OAEP-256+A256GCM] string:<encrypted-string>`
-- the prefix names the encryption method, not the product/version tag
+- `[genesis-enc-v1] [RSA-OAEP-256+A256GCM] string:<encrypted-string>`
+- `genesis-enc-v1` is the bridge/version tag
+- `RSA-OAEP-256+A256GCM` is the actual encryption method label placed before `string:`
 
 The page performs client-side hybrid encryption:
 
