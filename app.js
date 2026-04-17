@@ -1,4 +1,5 @@
-const PREFIX = '[genesis-enc-v1] string:';
+const ALGORITHM_LABEL = 'RSA-OAEP-256+A256GCM';
+const PREFIX = `[${ALGORITHM_LABEL}] string:`;
 const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
 MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA20TYKgSh2p9V3cKfGNMv
 tpgZh8AiSYQjtDF8sutZDrko9EfgvCKxP9onYeAuHb1hBmFgwMFO8WEIHSr9pazR
@@ -69,7 +70,7 @@ async function encryptString(plaintext) {
   const ciphertext = encryptedBytes.slice(0, encryptedBytes.length - 16);
   const payload = {
     v: 1,
-    alg: 'RSA-OAEP-256+A256GCM',
+    alg: ALGORITHM_LABEL,
     kid: KEY_FINGERPRINT,
     ek: base64UrlFromArrayBuffer(encryptedKey),
     iv: base64UrlFromArrayBuffer(iv.buffer),
