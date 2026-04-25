@@ -31,19 +31,22 @@
         </div>
 
         <div class="field">
-          <span>Broker API base</span>
-          <input id="api-base" type="text" value="http://127.0.0.1:8787" />
-        </div>
-
-        <div class="field">
           <span>How this works</span>
           <div class="note-card">
             <ul class="subtle bullet-list">
               <li>Click <strong>Mint OAuth link + package</strong></li>
+              <li>The page generates the real OAuth URL and portable package entirely in your browser</li>
               <li>Open the returned OAuth URL in your local browser</li>
               <li>Finish the login yourself with the OpenAI account you want</li>
               <li>Send Genesis the exported package and the callback URL in Telegram DM</li>
             </ul>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Important note</span>
+          <div class="note-card subtle">
+            The later callback application still needs Genesis. This page only mints the login URL and portable package.
           </div>
         </div>
 
@@ -58,14 +61,20 @@
           <textarea id="oauth-url" rows="5" readonly placeholder="Mint a flow to get a real OAuth URL."></textarea>
         </div>
 
-        <div class="field">
-          <span>State hint</span>
-          <input id="state-hint" type="text" readonly placeholder="State will appear here when available." />
+        <div class="field two-up">
+          <div>
+            <span>State hint</span>
+            <input id="state-hint" type="text" readonly placeholder="State will appear here when available." />
+          </div>
+          <div>
+            <span>Code verifier</span>
+            <input id="code-verifier" type="text" readonly placeholder="Generated locally for the portable package." />
+          </div>
         </div>
 
         <div class="field">
           <span>Portable package</span>
-          <textarea id="package-output" rows="18" readonly placeholder="Mint a flow to export the portable package."></textarea>
+          <textarea id="package-output" rows="20" readonly placeholder="Mint a flow to export the portable package."></textarea>
         </div>
 
         <div id="status" class="status subtle">Ready.</div>

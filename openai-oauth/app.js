@@ -1,11 +1,16 @@
-const apiBaseInput = document.getElementById('api-base');
 const mintButton = document.getElementById('mint-link-btn');
 const statusEl = document.getElementById('status');
 const oauthUrlEl = document.getElementById('oauth-url');
 const stateHintEl = document.getElementById('state-hint');
+const codeVerifierEl = document.getElementById('code-verifier');
 const packageOutput = document.getElementById('package-output');
 const copyLinkBtn = document.getElementById('copy-link-btn');
 const copyPackageBtn = document.getElementById('copy-package-btn');
+
+const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+const AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
+const REDIRECT_URI = 'http://localhost:1455/auth/callback';
+const SCOPE = 'openid profile email offline_access';
 
 let latestPackage = null;
 
@@ -18,60 +23,101 @@ async function copyText(text) {
   await navigator.clipboard.writeText(text);
 }
 
-function deriveStateHint(url) {
-  try {
-    return new URL(url).searchParams.get('state');
-  } catch {
-    return null;
+function base64urlEncode(bytes) {
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
   }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-mintButton.addEventListener('click', async () => {
-  const base = (apiBaseInput.value || '').trim().replace(/\/$/, '');
-  if (!base) {
-    setStatus('Enter a broker API base first.', 'error');
-    return;
-  }
-  mintButton.disabled = true;
+function randomHex(bytes = 16) {
+  const data = new Uint8Array(bytes);
+  crypto.getRandomValues(data);
+  return Array.from(data, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function generatePKCE() {
+  const verifierBytes = new Uint8Array(32);
+  crypto.getRandomValues(verifierBytes);
+  const verifier = base64urlEncode(verifierBytes);
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  const challenge = base64urlEncode(new Uint8Array(hash));
+  return { verifier, challenge };
+}
+
+async function mintPortablePackage() {
+  const { verifier, challenge } = await generatePKCE();
+  const state = randomHex(16);
+  const mintedAt = new Date().toISOString();
+  const url = new URL(AUTHORIZE_URL);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id', CLIENT_ID);
+  url.searchParams.set('redirect_uri', REDIRECT_URI);
+  url.searchParams.set('scope', SCOPE);
+  url.searchParams.set('code_challenge', challenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  url.searchParams.set('state', state);
+  url.searchParams.set('id_token_add_organizations', 'true');
+  url.searchParams.set('codex_cli_simplified_flow', 'true');
+  url.searchParams.set('originator', 'genesis-web');
+
+  return {
+    version: 2,
+    kind: 'openai-oauth-portable-flow',
+    sourceLane: 'genesis-web',
+    requestedBy: 'user',
+    mintedAt,
+    oauthUrl: url.toString(),
+    stateHint: state,
+    codeVerifier: verifier,
+    redirectUri: REDIRECT_URI,
+    clientId: CLIENT_ID,
+    applyInstructions: {
+      userWillProvide: [
+        'portable flow package',
+        'callback URL',
+        'requested target agent/lane',
+      ],
+      agentMustDo: [
+        'use the supplied codeVerifier and callback URL to complete the code exchange',
+        'persist auth in the requested target lane',
+        'verify the auth actually landed there',
+      ],
+    },
+    notes: [
+      'This package was minted entirely in the browser; no broker/backend was used for minting.',
+      'Later callback application still needs Genesis or another trusted runtime.',
+      'The login flow may redirect to localhost after sign-in; keep the callback URL so Genesis can apply it later.',
+    ],
+  };
+}
+
+function resetOutput() {
   latestPackage = null;
   oauthUrlEl.value = '';
   stateHintEl.value = '';
+  codeVerifierEl.value = '';
   packageOutput.value = '';
   copyLinkBtn.disabled = true;
   copyPackageBtn.disabled = true;
-  setStatus('Minting OAuth link and package…');
+}
+
+mintButton.addEventListener('click', async () => {
+  mintButton.disabled = true;
+  resetOutput();
+  setStatus('Minting OAuth link and package locally in your browser…');
   try {
-    const flowResp = await fetch(`${base}/flows`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lane: 'genesis' }),
-    });
-    const flowData = await flowResp.json();
-    if (!flowResp.ok || !flowData?.flow?.id) {
-      throw new Error(flowData?.error || 'flow creation failed');
-    }
+    latestPackage = await mintPortablePackage();
 
-    const pkgResp = await fetch(`${base}/flows/${flowData.flow.id}/package`);
-    const pkgData = await pkgResp.json();
-    if (!pkgResp.ok || !pkgData?.package) {
-      throw new Error(pkgData?.error || 'package export failed');
-    }
-
-    latestPackage = pkgData.package;
-    const oauthUrl = pkgData.package.oauthUrl || '';
-    const stateHint = pkgData.package.stateHint || deriveStateHint(oauthUrl) || '';
-
-    oauthUrlEl.value = oauthUrl;
-    stateHintEl.value = stateHint;
-    packageOutput.value = JSON.stringify(pkgData.package, null, 2);
-    copyLinkBtn.disabled = !oauthUrl;
+    oauthUrlEl.value = latestPackage.oauthUrl;
+    stateHintEl.value = latestPackage.stateHint;
+    codeVerifierEl.value = latestPackage.codeVerifier;
+    packageOutput.value = JSON.stringify(latestPackage, null, 2);
+    copyLinkBtn.disabled = false;
     copyPackageBtn.disabled = false;
 
-    if (oauthUrl) {
-      setStatus('OAuth link and package ready. Open the link locally, then send me the package + callback URL in Telegram DM.', 'success');
-    } else {
-      setStatus('Package exported, but no OAuth URL was captured in this run. Check the package diagnostics.', 'error');
-    }
+    setStatus('OAuth link and package ready. Open the link locally, then send Genesis the package + callback URL in Telegram DM.', 'success');
   } catch (error) {
     console.error(error);
     setStatus(`Mint failed: ${error?.message || String(error)}`, 'error');
