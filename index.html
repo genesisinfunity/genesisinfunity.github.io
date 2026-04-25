@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Genesis</title>
+    <title>Genesis tools</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -13,51 +13,21 @@
           <p class="eyebrow">Genesis tools</p>
           <h1>Genesis</h1>
           <p class="subtle">
-            Private helper tools for sending material to Genesis safely. Today this contains only Encryptor.
+            Private helper tools for secure handoff and future OAuth maintenance.
           </p>
         </div>
       </header>
 
       <section class="tool-grid" aria-label="Available tools">
-        <button class="tool-card active" id="tool-encryptor" type="button">
+        <a class="tool-card link-card" href="./encryptor/">
           <span class="tool-name">Encryptor</span>
-          <span class="tool-desc">Encrypt a secret with Genesis public key, then copy the exact message payload format.</span>
-        </button>
-      </section>
-
-      <section class="panel" id="encryptor-panel">
-        <div class="panel-header">
-          <div>
-            <h2>Encryptor</h2>
-            <p class="subtle small">
-              Clipboard output format is fixed to reduce back and forth:
-              <code>[genesis-enc-v1] [RSA-OAEP-256+A256GCM] string:&lt;encrypted-string&gt;</code>
-            </p>
-          </div>
-          <div class="meta">
-            <span id="kid-badge" class="badge"></span>
-          </div>
-        </div>
-
-        <label class="field">
-          <span>Secret text</span>
-          <textarea id="secret-input" rows="12" placeholder="Paste the secret here"></textarea>
-        </label>
-
-        <div class="actions">
-          <button id="encrypt-copy" class="primary" type="button">Encrypt + Copy</button>
-          <button id="clear-btn" type="button">Clear</button>
-        </div>
-
-        <label class="field">
-          <span>Generated payload</span>
-          <textarea id="payload-output" rows="8" readonly placeholder="Encrypted payload will appear here"></textarea>
-        </label>
-
-        <div id="status" class="status subtle"></div>
+          <span class="tool-desc">Encrypt a secret with Genesis public key, then copy the exact payload format.</span>
+        </a>
+        <a class="tool-card link-card" href="./openai-oauth/">
+          <span class="tool-name">OpenAI OAuth</span>
+          <span class="tool-desc">Planned helper surface for minting and handling OpenAI OAuth refresh flows with a backend broker.</span>
+        </a>
       </section>
     </main>
-
-    <script src="./app.js"></script>
   </body>
 </html>

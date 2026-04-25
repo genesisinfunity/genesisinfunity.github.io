@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Genesis OpenAI OAuth</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Genesis tools</p>
+          <h1>OpenAI OAuth</h1>
+          <p class="subtle">
+            Generate a real OpenAI OAuth login link plus a portable flow package, then send the package and callback URL back to Genesis in Telegram DM.
+          </p>
+        </div>
+      </header>
+
+      <p class="subtle small"><a class="inline-link" href="../">← Back to tools</a></p>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Mint link + package</h2>
+            <p class="subtle small">
+              This page is only responsible for two things: generating a real login link and exporting the portable package you’ll send back later with the callback URL.
+            </p>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Broker API base</span>
+          <input id="api-base" type="text" value="http://127.0.0.1:8787" />
+        </div>
+
+        <div class="field">
+          <span>How this works</span>
+          <div class="note-card">
+            <ul class="subtle bullet-list">
+              <li>Click <strong>Mint OAuth link + package</strong></li>
+              <li>Open the returned OAuth URL in your local browser</li>
+              <li>Finish the login yourself with the OpenAI account you want</li>
+              <li>Send Genesis the exported package and the callback URL in Telegram DM</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="mint-link-btn" class="primary" type="button">Mint OAuth link + package</button>
+          <button id="copy-link-btn" type="button" disabled>Copy OAuth link</button>
+          <button id="copy-package-btn" type="button" disabled>Copy package JSON</button>
+        </div>
+
+        <div class="field">
+          <span>OAuth URL</span>
+          <textarea id="oauth-url" rows="5" readonly placeholder="Mint a flow to get a real OAuth URL."></textarea>
+        </div>
+
+        <div class="field">
+          <span>State hint</span>
+          <input id="state-hint" type="text" readonly placeholder="State will appear here when available." />
+        </div>
+
+        <div class="field">
+          <span>Portable package</span>
+          <textarea id="package-output" rows="18" readonly placeholder="Mint a flow to export the portable package."></textarea>
+        </div>
+
+        <div id="status" class="status subtle">Ready.</div>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

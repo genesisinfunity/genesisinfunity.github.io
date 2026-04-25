@@ -76,11 +76,6 @@ button {
   cursor: pointer;
 }
 
-.link-card {
-  text-decoration: none;
-  display: block;
-}
-
 .tool-card.active {
   border-color: var(--accent);
   background: linear-gradient(180deg, rgba(140,180,255,0.13), rgba(18,26,49,1));
@@ -180,28 +175,6 @@ button:disabled {
 
 .status.success {
   color: #93f0ba;
-}
-
-.inline-link {
-  color: var(--accent-2);
-  text-decoration: none;
-}
-
-.inline-link:hover {
-  text-decoration: underline;
-}
-
-.note-card {
-  border: 1px solid var(--line);
-  background: #0b1226;
-  border-radius: 16px;
-  padding: 16px;
-}
-
-.bullet-list {
-  margin: 0;
-  padding-left: 18px;
-  line-height: 1.6;
 }
 
 @media (max-width: 640px) {
