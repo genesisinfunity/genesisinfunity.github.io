@@ -1,19 +1,18 @@
-const mintButton = document.getElementById('mint-link-btn');
-const statusEl = document.getElementById('status');
-const oauthUrlEl = document.getElementById('oauth-url');
-const stateHintEl = document.getElementById('state-hint');
-const codeVerifierEl = document.getElementById('code-verifier');
-const packageOutput = document.getElementById('package-output');
-const copyLinkBtn = document.getElementById('copy-link-btn');
-const copyPackageBtn = document.getElementById('copy-package-btn');
-const callbackUrlInput = document.getElementById('callback-url-input');
-const finalizeBtn = document.getElementById('finalize-btn');
-const copyHandoffBtn = document.getElementById('copy-handoff-btn');
-const callbackStateEl = document.getElementById('callback-state');
-const callbackCodePresentEl = document.getElementById('callback-code-present');
-const mintAgeEl = document.getElementById('mint-age');
-const validationResultEl = document.getElementById('validation-result');
-const handoffOutput = document.getElementById('handoff-output');
+const WRAPPER_VERSION = 'genesis-enc-v1';
+const ALGORITHM_LABEL = 'RSA-OAEP-256+A256GCM';
+const PREFIX = `[${WRAPPER_VERSION}] [${ALGORITHM_LABEL}] string:`;
+const PUBLIC_KEY_PEM = `-----BEGIN PUBLIC KEY-----
+MIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEA20TYKgSh2p9V3cKfGNMv
+tpgZh8AiSYQjtDF8sutZDrko9EfgvCKxP9onYeAuHb1hBmFgwMFO8WEIHSr9pazR
+rhl7XBx3DcsNNpXW/LuZJ2Fji5GBhfPm7C7QWfhvw8cTnLinIfQuv5pTF++T8O9I
+15XhpQ8+O02vS1vwtDNKNogTbX7FqQknkdvCj0htBk4+D4TX5/Ht9e8ke0M8UEtJ
+roC3zTzwtORpnCEdgQausTlCVek0Ch+W2GSd+sKEZ2LX2hgGaMN6/8hKS845V60W
+VcCRdKSKc4jRHR5LwKzlXcIP1BD/Xs6qRFWnUeO1l/+mJps6LImnUJ4GquP3lfKn
+/VecGTqZYSWL7IEFBZifpMeHCC5JDdf7Hiho8gKK0GR+4n6Cmer/1Iey9sLmVbm0
+QguZn4KhIo7tA4+6SlB0nVHe0X0PwfONDT8COpk+JNU5aZedn2U4RhjwqXT4gsdb
+wb96W6ZGgYMqJQnYhdd73Vv5R3AcCF99YYWSpCE7OhTxAgMBAAE=
+-----END PUBLIC KEY-----`;
+const KEY_FINGERPRINT = '87ac12997860b0b2';
 
 const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
@@ -21,22 +20,82 @@ const REDIRECT_URI = 'http://localhost:1455/auth/callback';
 const SCOPE = 'openid profile email offline_access';
 const SOFT_STALE_MINUTES = 10;
 
+const mintButton = document.getElementById('mint-link-btn');
+const oauthUrlEl = document.getElementById('oauth-url');
+const stateHintEl = document.getElementById('state-hint');
+const codeVerifierEl = document.getElementById('code-verifier');
+const callbackUrlInput = document.getElementById('callback-url-input');
+const buildCliProxyBtn = document.getElementById('build-cliproxy-btn');
+const buildOpenClawBtn = document.getElementById('build-openclaw-btn');
+const encryptedOutputEl = document.getElementById('encrypted-output');
+const payloadPreviewEl = document.getElementById('payload-preview');
+const callbackStateEl = document.getElementById('callback-state');
+const callbackCodePresentEl = document.getElementById('callback-code-present');
+const mintAgeEl = document.getElementById('mint-age');
+const validationResultEl = document.getElementById('validation-result');
+const statusEl = document.getElementById('status');
+const kidBadge = document.getElementById('kid-badge');
+
+kidBadge.textContent = `key ${KEY_FINGERPRINT.slice(0, 16)}`;
+
 let latestPackage = null;
-let latestHandoff = null;
 
 function setStatus(text, kind = 'subtle') {
   statusEl.textContent = text;
   statusEl.className = `status ${kind}`;
 }
 
-async function copyText(text) {
-  await navigator.clipboard.writeText(text);
-}
-
 function base64urlEncode(bytes) {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+function pemToArrayBuffer(pem) {
+  const body = pem.replace(/-----BEGIN PUBLIC KEY-----/, '').replace(/-----END PUBLIC KEY-----/, '').replace(/\s+/g, '');
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+async function importPublicKey() {
+  return crypto.subtle.importKey(
+    'spki',
+    pemToArrayBuffer(PUBLIC_KEY_PEM),
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    false,
+    ['encrypt'],
+  );
+}
+
+async function encryptString(plaintext) {
+  const encoder = new TextEncoder();
+  const rsaKey = await importPublicKey();
+  const aesKey = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintextBytes = encoder.encode(plaintext);
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, aesKey, plaintextBytes);
+  const rawAesKey = await crypto.subtle.exportKey('raw', aesKey);
+  const encryptedKey = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, rsaKey, rawAesKey);
+  const encryptedBytes = new Uint8Array(encrypted);
+  const tag = encryptedBytes.slice(encryptedBytes.length - 16);
+  const ciphertext = encryptedBytes.slice(0, encryptedBytes.length - 16);
+  const payload = {
+    v: 1,
+    alg: ALGORITHM_LABEL,
+    kid: KEY_FINGERPRINT,
+    ek: base64urlEncode(new Uint8Array(encryptedKey)),
+    iv: base64urlEncode(iv),
+    ct: base64urlEncode(ciphertext),
+    tag: base64urlEncode(tag),
+  };
+  const compact = base64urlEncode(new TextEncoder().encode(JSON.stringify(payload)));
+  return `${PREFIX}${compact}`;
+}
+
+async function copyText(text) {
+  await navigator.clipboard.writeText(text);
 }
 
 function randomHex(bytes = 16) {
@@ -81,32 +140,16 @@ async function mintPortablePackage() {
     codeVerifier: verifier,
     redirectUri: REDIRECT_URI,
     clientId: CLIENT_ID,
-    finalizeHints: {
-      softStaleAfterMinutes: SOFT_STALE_MINUTES,
-      expectedCallbackHost: 'localhost:1455',
-      requiredQueryKeys: ['code', 'state'],
-    },
   };
 }
 
-function resetMintOutput() {
-  latestPackage = null;
-  oauthUrlEl.value = '';
-  stateHintEl.value = '';
-  codeVerifierEl.value = '';
-  packageOutput.value = '';
-  copyLinkBtn.disabled = true;
-  copyPackageBtn.disabled = true;
-}
-
-function resetFinalizeOutput() {
-  latestHandoff = null;
+function resetOutputs() {
+  encryptedOutputEl.value = '';
+  payloadPreviewEl.value = '';
   callbackStateEl.value = '';
   callbackCodePresentEl.value = '';
   mintAgeEl.value = '';
   validationResultEl.value = '';
-  handoffOutput.value = '';
-  copyHandoffBtn.disabled = true;
 }
 
 function parseCallbackUrl(raw) {
@@ -140,13 +183,11 @@ function formatAge(minutes) {
   return `${m}m`;
 }
 
-function buildCurrentPackage() {
+function requireMint() {
   if (latestPackage) return latestPackage;
   const stateHint = stateHintEl.value.trim();
   const codeVerifier = codeVerifierEl.value.trim();
-  if (!stateHint || !codeVerifier) {
-    throw new Error('Mint first so this page has a state hint and code verifier to validate against.');
-  }
+  if (!stateHint || !codeVerifier) throw new Error('Mint first.');
   return {
     version: 3,
     kind: 'openai-oauth-portable-flow',
@@ -161,85 +202,110 @@ function buildCurrentPackage() {
   };
 }
 
-function buildHandoff(pkg, callback) {
+function validate(pkg, callback) {
   const ageMinutes = pkg.mintedAt ? minutesBetween(pkg.mintedAt, new Date().toISOString()) : null;
   const hasCode = Boolean(callback.code);
   const stateMatches = callback.state === pkg.stateHint;
-  const hasExpectedOrigin = callback.origin === 'http://localhost:1455';
+  const hasExpectedOrigin = callback.origin === REDIRECT_URI.replace('/auth/callback', '');
   const softStale = ageMinutes !== null && ageMinutes > SOFT_STALE_MINUTES;
+  let result = 'valid';
+  if (!hasCode) result = 'missing_code';
+  else if (!stateMatches) result = 'state_mismatch';
+  else if (!hasExpectedOrigin) result = 'unexpected_origin';
+  else if (softStale) result = 'stale_warning';
+  return { result, ageMinutes, hasCode, stateMatches, hasExpectedOrigin };
+}
 
-  let validation = 'valid';
-  if (!hasCode) validation = 'missing_code';
-  else if (!stateMatches) validation = 'state_mismatch';
-  else if (!hasExpectedOrigin) validation = 'unexpected_origin';
-  else if (softStale) validation = 'stale_warning';
+function buildTargetPayload(target) {
+  const pkg = requireMint();
+  const callback = parseCallbackUrl(callbackUrlInput.value);
+  const validation = validate(pkg, callback);
 
-  const normalized = {
+  callbackStateEl.value = callback.state || '';
+  callbackCodePresentEl.value = validation.hasCode ? 'yes' : 'no';
+  mintAgeEl.value = formatAge(validation.ageMinutes);
+  validationResultEl.value = validation.result;
+
+  const payload = {
     version: 1,
-    kind: 'openai-oauth-finalize-handoff',
-    mintedPackage: {
-      kind: pkg.kind,
-      version: pkg.version,
-      mintedAt: pkg.mintedAt,
-      clientId: pkg.clientId,
-      redirectUri: pkg.redirectUri,
-      stateHint: pkg.stateHint,
-      codeVerifier: pkg.codeVerifier,
-      sourceLane: pkg.sourceLane,
-    },
-    callback: {
-      rawUrl: callback.raw,
-      origin: callback.origin,
-      path: callback.path,
-      state: callback.state,
-      hasCode,
-      code: callback.code,
-      error: callback.error,
-      query: callback.query,
+    kind: target === 'cliproxyapi' ? 'genesis-openai-oauth-cliproxyapi-import' : 'genesis-openai-oauth-openclaw-import',
+    target,
+    envelope: {
+      encrypted: true,
+      wrapper: WRAPPER_VERSION,
+      algorithm: ALGORITHM_LABEL,
+      kid: KEY_FINGERPRINT,
+      source: 'genesisinfunity.github.io/openai-oauth',
+      createdAt: new Date().toISOString(),
     },
     validation: {
-      result: validation,
-      ageMinutes,
+      result: validation.result,
+      ageMinutes: validation.ageMinutes,
       softStaleAfterMinutes: SOFT_STALE_MINUTES,
-      stateMatches,
-      expectedOrigin: 'http://localhost:1455',
+      stateMatches: validation.stateMatches,
+      expectedOrigin: REDIRECT_URI.replace('/auth/callback', ''),
       actualOrigin: callback.origin,
     },
-    exportHints: {
-      openclaw: {
-        expectedUse: 'trusted runtime completes token exchange and persists auth into requested lane',
-      },
-      cliproxyapi: {
-        expectedUse: 'trusted runtime completes token exchange then writes CLIProxyAPI auth JSON',
-      },
+    oauth: {
+      clientId: pkg.clientId,
+      redirectUri: pkg.redirectUri,
+      mintedAt: pkg.mintedAt,
+      sourceLane: pkg.sourceLane,
+      stateHint: pkg.stateHint,
+      callbackUrl: callback.raw,
+      authorizationCode: callback.code,
+      codeVerifier: pkg.codeVerifier,
+      scope: callback.query.scope || SCOPE,
     },
   };
 
-  return {
-    normalized,
-    summary: {
-      validation,
-      ageMinutes,
-      hasCode,
-      callbackState: callback.state || '',
-    },
-  };
+  if (target === 'cliproxyapi') {
+    payload.cliproxyapi = {
+      expectedAuthType: 'codex',
+      expectedFieldsAfterExchange: ['access_token', 'refresh_token', 'id_token', 'account_id', 'email', 'type', 'expired', 'last_refresh'],
+    };
+  } else {
+    payload.openclaw = {
+      expectedMode: 'oauth',
+      expectedProvider: 'openai-codex',
+    };
+  }
+
+  return payload;
+}
+
+async function buildAndCopy(target) {
+  buildCliProxyBtn.disabled = true;
+  buildOpenClawBtn.disabled = true;
+  setStatus(`Building ${target} package…`);
+  try {
+    const payload = buildTargetPayload(target);
+    payloadPreviewEl.value = JSON.stringify(payload, null, 2);
+    const encrypted = await encryptString(JSON.stringify(payload));
+    encryptedOutputEl.value = encrypted;
+    await copyText(encrypted);
+    const kind = payload.validation.result === 'valid' ? 'success' : payload.validation.result === 'stale_warning' ? 'subtle' : 'error';
+    setStatus(`${target} package encrypted and copied.`, kind);
+  } catch (error) {
+    console.error(error);
+    setStatus(`Build failed: ${error?.message || String(error)}`, 'error');
+  } finally {
+    buildCliProxyBtn.disabled = false;
+    buildOpenClawBtn.disabled = false;
+  }
 }
 
 mintButton.addEventListener('click', async () => {
   mintButton.disabled = true;
-  resetMintOutput();
-  resetFinalizeOutput();
+  resetOutputs();
   setStatus('Minting locally…');
   try {
     latestPackage = await mintPortablePackage();
     oauthUrlEl.value = latestPackage.oauthUrl;
     stateHintEl.value = latestPackage.stateHint;
     codeVerifierEl.value = latestPackage.codeVerifier;
-    packageOutput.value = JSON.stringify(latestPackage, null, 2);
-    copyLinkBtn.disabled = false;
-    copyPackageBtn.disabled = false;
-    setStatus('Mint ready.', 'success');
+    await copyText(latestPackage.oauthUrl);
+    setStatus('Login link copied.', 'success');
   } catch (error) {
     console.error(error);
     setStatus(`Mint failed: ${error?.message || String(error)}`, 'error');
@@ -248,45 +314,5 @@ mintButton.addEventListener('click', async () => {
   }
 });
 
-finalizeBtn.addEventListener('click', async () => {
-  resetFinalizeOutput();
-  finalizeBtn.disabled = true;
-  setStatus('Validating callback locally…');
-  try {
-    const pkg = buildCurrentPackage();
-    const callback = parseCallbackUrl(callbackUrlInput.value);
-    const result = buildHandoff(pkg, callback);
-    latestHandoff = result.normalized;
-    callbackStateEl.value = result.summary.callbackState;
-    callbackCodePresentEl.value = result.summary.hasCode ? 'yes' : 'no';
-    mintAgeEl.value = formatAge(result.summary.ageMinutes);
-    validationResultEl.value = result.summary.validation;
-    handoffOutput.value = JSON.stringify(result.normalized, null, 2);
-    copyHandoffBtn.disabled = false;
-    const kind = result.summary.validation === 'valid' ? 'success' : result.summary.validation === 'stale_warning' ? 'subtle' : 'error';
-    setStatus(`Finalize ${result.summary.validation}.`, kind);
-  } catch (error) {
-    console.error(error);
-    setStatus(`Finalize failed: ${error?.message || String(error)}`, 'error');
-  } finally {
-    finalizeBtn.disabled = false;
-  }
-});
-
-copyLinkBtn.addEventListener('click', async () => {
-  if (!oauthUrlEl.value) return;
-  await copyText(oauthUrlEl.value);
-  setStatus('OAuth link copied.', 'success');
-});
-
-copyPackageBtn.addEventListener('click', async () => {
-  if (!packageOutput.value) return;
-  await copyText(packageOutput.value);
-  setStatus('Handoff package copied.', 'success');
-});
-
-copyHandoffBtn.addEventListener('click', async () => {
-  if (!handoffOutput.value) return;
-  await copyText(handoffOutput.value);
-  setStatus('Handoff JSON copied.', 'success');
-});
+buildCliProxyBtn.addEventListener('click', async () => buildAndCopy('cliproxyapi'));
+buildOpenClawBtn.addEventListener('click', async () => buildAndCopy('openclaw'));

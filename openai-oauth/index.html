@@ -13,6 +13,9 @@
           <p class="eyebrow">Genesis tools</p>
           <h1>OpenAI OAuth</h1>
         </div>
+        <div class="meta">
+          <span id="kid-badge" class="badge"></span>
+        </div>
       </header>
 
       <p class="subtle small"><a class="inline-link" href="../">← Back to tools</a></p>
@@ -23,38 +26,32 @@
         </div>
 
         <div class="actions">
-          <button id="mint-link-btn" class="primary" type="button">Mint OAuth link</button>
-          <button id="copy-link-btn" type="button" disabled>Copy OAuth link</button>
-          <button id="copy-package-btn" type="button" disabled>Copy handoff package</button>
+          <button id="mint-link-btn" class="primary" type="button">Mint + copy login link</button>
         </div>
 
         <div class="field">
           <span>OAuth URL</span>
-          <textarea id="oauth-url" rows="5" readonly placeholder="Mint a flow to get a real OAuth URL."></textarea>
-        </div>
-
-        <div class="field two-up">
-          <div>
-            <span>State hint</span>
-            <input id="state-hint" type="text" readonly placeholder="State" />
-          </div>
-          <div>
-            <span>Code verifier</span>
-            <input id="code-verifier" type="text" readonly placeholder="Code verifier" />
-          </div>
+          <textarea id="oauth-url" rows="4" readonly placeholder="Mint a flow to get a real OAuth URL."></textarea>
         </div>
 
         <details class="compact-details">
-          <summary>Show handoff package</summary>
-          <div class="field details-body">
-            <textarea id="package-output" rows="12" readonly placeholder="Mint a flow to export the handoff package."></textarea>
+          <summary>Show mint details</summary>
+          <div class="field two-up details-body">
+            <div>
+              <span>State hint</span>
+              <input id="state-hint" type="text" readonly placeholder="State" />
+            </div>
+            <div>
+              <span>Code verifier</span>
+              <input id="code-verifier" type="text" readonly placeholder="Code verifier" />
+            </div>
           </div>
         </details>
       </section>
 
       <section class="panel">
         <div class="panel-header compact-header">
-          <h2>2. Finalize</h2>
+          <h2>2. Paste callback</h2>
         </div>
 
         <div class="field">
@@ -63,33 +60,40 @@
         </div>
 
         <div class="actions">
-          <button id="finalize-btn" class="primary" type="button">Validate + build handoff</button>
-          <button id="copy-handoff-btn" type="button" disabled>Copy handoff JSON</button>
-        </div>
-
-        <div class="field two-up metrics-grid">
-          <div>
-            <span>Callback state</span>
-            <input id="callback-state" type="text" readonly placeholder="state" />
-          </div>
-          <div>
-            <span>Auth code present</span>
-            <input id="callback-code-present" type="text" readonly placeholder="yes / no" />
-          </div>
-          <div>
-            <span>Mint age</span>
-            <input id="mint-age" type="text" readonly placeholder="age" />
-          </div>
-          <div>
-            <span>Validation</span>
-            <input id="validation-result" type="text" readonly placeholder="ok / stale / mismatch" />
-          </div>
+          <button id="build-cliproxy-btn" class="primary" type="button">Build CLIProxyAPI package</button>
+          <button id="build-openclaw-btn" type="button">Build OpenClaw package</button>
         </div>
 
         <div class="field">
-          <span>Normalized handoff JSON</span>
-          <textarea id="handoff-output" rows="18" readonly placeholder="Validation output will appear here."></textarea>
+          <span>Encrypted package</span>
+          <textarea id="encrypted-output" rows="8" readonly placeholder="Encrypted package will appear here and auto-copy."></textarea>
         </div>
+
+        <details class="compact-details">
+          <summary>Show debug details</summary>
+          <div class="field two-up metrics-grid details-body">
+            <div>
+              <span>Callback state</span>
+              <input id="callback-state" type="text" readonly placeholder="state" />
+            </div>
+            <div>
+              <span>Auth code present</span>
+              <input id="callback-code-present" type="text" readonly placeholder="yes / no" />
+            </div>
+            <div>
+              <span>Mint age</span>
+              <input id="mint-age" type="text" readonly placeholder="age" />
+            </div>
+            <div>
+              <span>Validation</span>
+              <input id="validation-result" type="text" readonly placeholder="ok / stale / mismatch" />
+            </div>
+          </div>
+          <div class="field details-body">
+            <span>Unencrypted payload preview</span>
+            <textarea id="payload-preview" rows="18" readonly placeholder="Preview will appear here after build."></textarea>
+          </div>
+        </details>
       </section>
 
       <div id="status" class="status subtle">Ready.</div>
