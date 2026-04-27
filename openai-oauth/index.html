@@ -12,42 +12,14 @@
         <div>
           <p class="eyebrow">Genesis tools</p>
           <h1>OpenAI OAuth</h1>
-          <p class="subtle">
-            Generate a real OpenAI OAuth login link plus a portable flow package, then send the package and callback URL back to Genesis in Telegram DM.
-          </p>
         </div>
       </header>
 
       <p class="subtle small"><a class="inline-link" href="../">← Back to tools</a></p>
 
       <section class="panel">
-        <div class="panel-header">
-          <div>
-            <h2>Mint link + package</h2>
-            <p class="subtle small">
-              This page is only responsible for two things: generating a real login link and exporting the portable package you’ll send back later with the callback URL.
-            </p>
-          </div>
-        </div>
-
-        <div class="field">
-          <span>How this works</span>
-          <div class="note-card">
-            <ul class="subtle bullet-list">
-              <li>Click <strong>Mint OAuth link + package</strong></li>
-              <li>The page generates the real OAuth URL and portable package entirely in your browser</li>
-              <li>Open the returned OAuth URL in your local browser</li>
-              <li>Finish the login yourself with the OpenAI account you want</li>
-              <li>Send Genesis the exported package and the callback URL in Telegram DM</li>
-            </ul>
-          </div>
-        </div>
-
-        <div class="field">
-          <span>Important note</span>
-          <div class="note-card subtle">
-            The later callback application still needs Genesis. This page only mints the login URL and portable package.
-          </div>
+        <div class="panel-header compact-header">
+          <h2>1. Mint</h2>
         </div>
 
         <div class="actions">
@@ -64,21 +36,66 @@
         <div class="field two-up">
           <div>
             <span>State hint</span>
-            <input id="state-hint" type="text" readonly placeholder="State will appear here when available." />
+            <input id="state-hint" type="text" readonly placeholder="State" />
           </div>
           <div>
             <span>Code verifier</span>
-            <input id="code-verifier" type="text" readonly placeholder="Generated locally for the portable package." />
+            <input id="code-verifier" type="text" readonly placeholder="Code verifier" />
           </div>
         </div>
 
         <div class="field">
           <span>Portable package</span>
-          <textarea id="package-output" rows="20" readonly placeholder="Mint a flow to export the portable package."></textarea>
+          <textarea id="package-output" rows="14" readonly placeholder="Mint a flow to export the portable package."></textarea>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header compact-header">
+          <h2>2. Finalize</h2>
         </div>
 
-        <div id="status" class="status subtle">Ready.</div>
+        <div class="field">
+          <span>Portable package JSON</span>
+          <textarea id="finalize-package-input" rows="10" placeholder="Paste portable package JSON here."></textarea>
+        </div>
+
+        <div class="field">
+          <span>Localhost callback URL</span>
+          <textarea id="callback-url-input" rows="4" placeholder="Paste the localhost callback URL here."></textarea>
+        </div>
+
+        <div class="actions">
+          <button id="finalize-btn" class="primary" type="button">Validate + build handoff</button>
+          <button id="copy-handoff-btn" type="button" disabled>Copy handoff JSON</button>
+        </div>
+
+        <div class="field two-up metrics-grid">
+          <div>
+            <span>Callback state</span>
+            <input id="callback-state" type="text" readonly placeholder="state" />
+          </div>
+          <div>
+            <span>Auth code present</span>
+            <input id="callback-code-present" type="text" readonly placeholder="yes / no" />
+          </div>
+          <div>
+            <span>Mint age</span>
+            <input id="mint-age" type="text" readonly placeholder="age" />
+          </div>
+          <div>
+            <span>Validation</span>
+            <input id="validation-result" type="text" readonly placeholder="ok / stale / mismatch" />
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Normalized handoff JSON</span>
+          <textarea id="handoff-output" rows="18" readonly placeholder="Validation output will appear here."></textarea>
+        </div>
       </section>
+
+      <div id="status" class="status subtle">Ready.</div>
     </main>
     <script src="./app.js"></script>
   </body>

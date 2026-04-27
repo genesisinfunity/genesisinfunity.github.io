@@ -47,56 +47,23 @@ code {
 
 h1, h2 { margin: 0; }
 h1 { font-size: clamp(2rem, 4vw, 3rem); }
-h2 { font-size: 1.4rem; }
+h2 { font-size: 1.2rem; }
 
 .subtle { color: var(--muted); }
 .small { font-size: 0.95rem; }
 
-.tool-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.tool-card,
 .panel,
 textarea,
-button {
+button,
+input[type="text"] {
   border-radius: 16px;
-}
-
-.tool-card {
-  width: 100%;
-  border: 1px solid var(--line);
-  background: var(--panel);
-  color: var(--text);
-  padding: 18px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.tool-card.active {
-  border-color: var(--accent);
-  background: linear-gradient(180deg, rgba(140,180,255,0.13), rgba(18,26,49,1));
-}
-
-.tool-name {
-  display: block;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.tool-desc {
-  display: block;
-  color: var(--muted);
-  line-height: 1.45;
 }
 
 .panel {
   border: 1px solid var(--line);
   background: rgba(18,26,49,0.92);
   padding: 20px;
+  margin-bottom: 16px;
 }
 
 .panel-header {
@@ -107,14 +74,8 @@ button {
   margin-bottom: 18px;
 }
 
-.badge {
-  display: inline-flex;
-  padding: 8px 12px;
-  border-radius: 999px;
-  background: var(--panel-2);
-  border: 1px solid var(--line);
-  color: var(--accent-2);
-  font-size: 0.85rem;
+.compact-header {
+  margin-bottom: 14px;
 }
 
 .field {
@@ -133,6 +94,10 @@ button {
 .two-up {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.metrics-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 textarea,
@@ -173,18 +138,6 @@ button:disabled {
   opacity: 0.65;
 }
 
-.note-card {
-  border: 1px solid var(--line);
-  background: rgba(11, 18, 38, 0.72);
-  padding: 14px 16px;
-  border-radius: 14px;
-}
-
-.bullet-list {
-  margin: 0;
-  padding-left: 1.2rem;
-}
-
 .inline-link {
   color: var(--accent-2);
   text-decoration: none;
@@ -210,5 +163,6 @@ button:disabled {
 @media (max-width: 640px) {
   .app-shell { width: min(100vw - 20px, 920px); padding-top: 18px; }
   .panel-header { flex-direction: column; }
-  .two-up { grid-template-columns: 1fr; }
+  .two-up,
+  .metrics-grid { grid-template-columns: 1fr; }
 }
