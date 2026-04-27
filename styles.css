@@ -204,6 +204,17 @@ button:disabled {
   line-height: 1.6;
 }
 
+.site-footer {
+  margin-top: 18px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.site-footer code {
+  color: var(--accent-2);
+}
+
 @media (max-width: 640px) {
   .app-shell { width: min(100vw - 20px, 920px); padding-top: 18px; }
   .panel-header { flex-direction: column; }
