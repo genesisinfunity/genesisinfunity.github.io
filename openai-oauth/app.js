@@ -235,84 +235,39 @@ async function exchangeCode(pkg, callback) {
   return data;
 }
 
-function buildDurablePayload(target, pkg, callback, validation, tokenResponse) {
+async function buildDurablePayload(target, pkg, callback, validation, tokenResponse) {
   const idPayload = tokenResponse.id_token ? base64urlDecodeJson(tokenResponse.id_token.split('.')[1]) : {};
   const authClaims = idPayload['https://api.openai.com/auth'] || {};
   const email = idPayload.email || null;
   const accountId = authClaims.chatgpt_account_id || null;
-  const planType = authClaims.chatgpt_plan_type || null;
-
-  const payload = {
-    version: 2,
-    kind: target === 'cliproxyapi' ? 'genesis-openai-oauth-cliproxyapi-durable-import' : 'genesis-openai-oauth-openclaw-durable-import',
-    target,
-    envelope: {
-      encrypted: true,
-      wrapper: WRAPPER_VERSION,
-      algorithm: ALGORITHM_LABEL,
-      kid: KEY_FINGERPRINT,
-      source: 'genesisinfunity.github.io/openai-oauth',
-      createdAt: new Date().toISOString(),
-      containsDurableTokens: true,
-    },
-    validation: {
-      result: validation.result,
-      ageMinutes: validation.ageMinutes,
-      softStaleAfterMinutes: SOFT_STALE_MINUTES,
-      stateMatches: validation.stateMatches,
-      expectedOrigin: REDIRECT_URI.replace('/auth/callback', ''),
-      actualOrigin: callback.origin,
-    },
-    oauth: {
-      clientId: pkg.clientId,
-      redirectUri: pkg.redirectUri,
-      mintedAt: pkg.mintedAt,
-      sourceLane: pkg.sourceLane,
-      stateHint: pkg.stateHint,
-      callbackUrl: callback.raw,
-      scope: callback.query.scope || SCOPE,
-      exchangedAt: new Date().toISOString(),
-      email,
-      accountId,
-      planType,
-    },
-    tokens: {
-      access_token: tokenResponse.access_token,
-      refresh_token: tokenResponse.refresh_token,
-      id_token: tokenResponse.id_token,
-      token_type: tokenResponse.token_type,
-      expires_in: tokenResponse.expires_in,
-      scope: tokenResponse.scope,
-    },
-  };
+  const encryptedTokens = await encryptString(JSON.stringify({
+    access_token: tokenResponse.access_token,
+    refresh_token: tokenResponse.refresh_token,
+    id_token: tokenResponse.id_token,
+  }));
 
   if (target === 'cliproxyapi') {
-    payload.cliproxyapi = {
-      authFileTemplate: {
-        access_token: tokenResponse.access_token,
-        refresh_token: tokenResponse.refresh_token,
-        id_token: tokenResponse.id_token,
-        account_id: accountId,
-        email,
-        type: 'codex',
-        disabled: false,
-        expired: false,
-      },
-    };
-  } else {
-    payload.openclaw = {
-      provider: 'openai-codex',
-      mode: 'oauth',
-      profileTemplate: {
-        provider: 'openai-codex',
-        mode: 'oauth',
-        email,
-        account_id: accountId,
-      },
+    return {
+      v: 1,
+      target: 'cliproxyapi',
+      account_id: accountId,
+      email,
+      type: 'codex',
+      disabled: false,
+      expired: false,
+      tokens_enc: encryptedTokens,
     };
   }
 
-  return payload;
+  return {
+    v: 1,
+    target: 'openclaw',
+    provider: 'openai-codex',
+    mode: 'oauth',
+    account_id: accountId,
+    email,
+    tokens_enc: encryptedTokens,
+  };
 }
 
 async function buildAndCopy(target) {
@@ -331,12 +286,12 @@ async function buildAndCopy(target) {
       throw new Error(`Callback validation failed: ${validation.result}`);
     }
     const tokenResponse = await exchangeCode(pkg, callback);
-    const payload = buildDurablePayload(target, pkg, callback, validation, tokenResponse);
+    const payload = await buildDurablePayload(target, pkg, callback, validation, tokenResponse);
     payloadPreviewEl.value = JSON.stringify(payload, null, 2);
-    const encrypted = await encryptString(JSON.stringify(payload));
-    encryptedOutputEl.value = encrypted;
-    await copyText(encrypted);
-    setStatus(`${target} durable package exchanged, encrypted, and copied.`, validation.result === 'valid' ? 'success' : 'subtle');
+    const output = JSON.stringify(payload);
+    encryptedOutputEl.value = output;
+    await copyText(output);
+    setStatus(`${target} durable package exchanged and copied.`, validation.result === 'valid' ? 'success' : 'subtle');
   } catch (error) {
     console.error(error);
     setStatus(`Build failed: ${error?.message || String(error)}`, 'error');
