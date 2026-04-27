@@ -16,6 +16,7 @@ const KEY_FINGERPRINT = '87ac12997860b0b2';
 
 const CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
+const TOKEN_URL = 'https://auth.openai.com/oauth/token';
 const REDIRECT_URI = 'http://localhost:1455/auth/callback';
 const SCOPE = 'openid profile email offline_access';
 const SOFT_STALE_MINUTES = 10;
@@ -51,6 +52,11 @@ function base64urlEncode(bytes) {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
+function base64urlDecodeJson(seg) {
+  const padded = seg + '='.repeat((4 - (seg.length % 4)) % 4);
+  return JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')));
+}
+
 function pemToArrayBuffer(pem) {
   const body = pem.replace(/-----BEGIN PUBLIC KEY-----/, '').replace(/-----END PUBLIC KEY-----/, '').replace(/\s+/g, '');
   const binary = atob(body);
@@ -60,13 +66,7 @@ function pemToArrayBuffer(pem) {
 }
 
 async function importPublicKey() {
-  return crypto.subtle.importKey(
-    'spki',
-    pemToArrayBuffer(PUBLIC_KEY_PEM),
-    { name: 'RSA-OAEP', hash: 'SHA-256' },
-    false,
-    ['encrypt'],
-  );
+  return crypto.subtle.importKey('spki', pemToArrayBuffer(PUBLIC_KEY_PEM), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
 }
 
 async function encryptString(plaintext) {
@@ -90,8 +90,7 @@ async function encryptString(plaintext) {
     ct: base64urlEncode(ciphertext),
     tag: base64urlEncode(tag),
   };
-  const compact = base64urlEncode(new TextEncoder().encode(JSON.stringify(payload)));
-  return `${PREFIX}${compact}`;
+  return `${PREFIX}${base64urlEncode(new TextEncoder().encode(JSON.stringify(payload)))}`;
 }
 
 async function copyText(text) {
@@ -128,7 +127,6 @@ async function mintPortablePackage() {
   url.searchParams.set('id_token_add_organizations', 'true');
   url.searchParams.set('codex_cli_simplified_flow', 'true');
   url.searchParams.set('originator', 'genesis-web');
-
   return {
     version: 3,
     kind: 'openai-oauth-portable-flow',
@@ -179,8 +177,7 @@ function formatAge(minutes) {
   if (minutes === null) return 'unknown';
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 function requireMint() {
@@ -216,19 +213,38 @@ function validate(pkg, callback) {
   return { result, ageMinutes, hasCode, stateMatches, hasExpectedOrigin };
 }
 
-function buildTargetPayload(target) {
-  const pkg = requireMint();
-  const callback = parseCallbackUrl(callbackUrlInput.value);
-  const validation = validate(pkg, callback);
+async function exchangeCode(pkg, callback) {
+  const body = new URLSearchParams({
+    grant_type: 'authorization_code',
+    client_id: pkg.clientId,
+    code: callback.code,
+    redirect_uri: pkg.redirectUri,
+    code_verifier: pkg.codeVerifier,
+  });
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body,
+  });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error(`Token exchange failed: ${text.slice(0, 200)}`); }
+  if (!res.ok) {
+    throw new Error(data.error_description || data.detail || data.error || `HTTP ${res.status}`);
+  }
+  return data;
+}
 
-  callbackStateEl.value = callback.state || '';
-  callbackCodePresentEl.value = validation.hasCode ? 'yes' : 'no';
-  mintAgeEl.value = formatAge(validation.ageMinutes);
-  validationResultEl.value = validation.result;
+function buildDurablePayload(target, pkg, callback, validation, tokenResponse) {
+  const idPayload = tokenResponse.id_token ? base64urlDecodeJson(tokenResponse.id_token.split('.')[1]) : {};
+  const authClaims = idPayload['https://api.openai.com/auth'] || {};
+  const email = idPayload.email || null;
+  const accountId = authClaims.chatgpt_account_id || null;
+  const planType = authClaims.chatgpt_plan_type || null;
 
   const payload = {
-    version: 1,
-    kind: target === 'cliproxyapi' ? 'genesis-openai-oauth-cliproxyapi-import' : 'genesis-openai-oauth-openclaw-import',
+    version: 2,
+    kind: target === 'cliproxyapi' ? 'genesis-openai-oauth-cliproxyapi-durable-import' : 'genesis-openai-oauth-openclaw-durable-import',
     target,
     envelope: {
       encrypted: true,
@@ -237,6 +253,7 @@ function buildTargetPayload(target) {
       kid: KEY_FINGERPRINT,
       source: 'genesisinfunity.github.io/openai-oauth',
       createdAt: new Date().toISOString(),
+      containsDurableTokens: true,
     },
     validation: {
       result: validation.result,
@@ -253,21 +270,45 @@ function buildTargetPayload(target) {
       sourceLane: pkg.sourceLane,
       stateHint: pkg.stateHint,
       callbackUrl: callback.raw,
-      authorizationCode: callback.code,
-      codeVerifier: pkg.codeVerifier,
       scope: callback.query.scope || SCOPE,
+      exchangedAt: new Date().toISOString(),
+      email,
+      accountId,
+      planType,
+    },
+    tokens: {
+      access_token: tokenResponse.access_token,
+      refresh_token: tokenResponse.refresh_token,
+      id_token: tokenResponse.id_token,
+      token_type: tokenResponse.token_type,
+      expires_in: tokenResponse.expires_in,
+      scope: tokenResponse.scope,
     },
   };
 
   if (target === 'cliproxyapi') {
     payload.cliproxyapi = {
-      expectedAuthType: 'codex',
-      expectedFieldsAfterExchange: ['access_token', 'refresh_token', 'id_token', 'account_id', 'email', 'type', 'expired', 'last_refresh'],
+      authFileTemplate: {
+        access_token: tokenResponse.access_token,
+        refresh_token: tokenResponse.refresh_token,
+        id_token: tokenResponse.id_token,
+        account_id: accountId,
+        email,
+        type: 'codex',
+        disabled: false,
+        expired: false,
+      },
     };
   } else {
     payload.openclaw = {
-      expectedMode: 'oauth',
-      expectedProvider: 'openai-codex',
+      provider: 'openai-codex',
+      mode: 'oauth',
+      profileTemplate: {
+        provider: 'openai-codex',
+        mode: 'oauth',
+        email,
+        account_id: accountId,
+      },
     };
   }
 
@@ -277,15 +318,25 @@ function buildTargetPayload(target) {
 async function buildAndCopy(target) {
   buildCliProxyBtn.disabled = true;
   buildOpenClawBtn.disabled = true;
-  setStatus(`Building ${target} package…`);
+  setStatus(`Exchanging and building ${target} package…`);
   try {
-    const payload = buildTargetPayload(target);
+    const pkg = requireMint();
+    const callback = parseCallbackUrl(callbackUrlInput.value);
+    const validation = validate(pkg, callback);
+    callbackStateEl.value = callback.state || '';
+    callbackCodePresentEl.value = validation.hasCode ? 'yes' : 'no';
+    mintAgeEl.value = formatAge(validation.ageMinutes);
+    validationResultEl.value = validation.result;
+    if (!['valid', 'stale_warning'].includes(validation.result)) {
+      throw new Error(`Callback validation failed: ${validation.result}`);
+    }
+    const tokenResponse = await exchangeCode(pkg, callback);
+    const payload = buildDurablePayload(target, pkg, callback, validation, tokenResponse);
     payloadPreviewEl.value = JSON.stringify(payload, null, 2);
     const encrypted = await encryptString(JSON.stringify(payload));
     encryptedOutputEl.value = encrypted;
     await copyText(encrypted);
-    const kind = payload.validation.result === 'valid' ? 'success' : payload.validation.result === 'stale_warning' ? 'subtle' : 'error';
-    setStatus(`${target} package encrypted and copied.`, kind);
+    setStatus(`${target} durable package exchanged, encrypted, and copied.`, validation.result === 'valid' ? 'success' : 'subtle');
   } catch (error) {
     console.error(error);
     setStatus(`Build failed: ${error?.message || String(error)}`, 'error');
