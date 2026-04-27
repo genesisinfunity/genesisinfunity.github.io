@@ -23,9 +23,9 @@
         </div>
 
         <div class="actions">
-          <button id="mint-link-btn" class="primary" type="button">Mint OAuth link + package</button>
+          <button id="mint-link-btn" class="primary" type="button">Mint OAuth link</button>
           <button id="copy-link-btn" type="button" disabled>Copy OAuth link</button>
-          <button id="copy-package-btn" type="button" disabled>Copy package JSON</button>
+          <button id="copy-package-btn" type="button" disabled>Copy handoff package</button>
         </div>
 
         <div class="field">
@@ -44,20 +44,17 @@
           </div>
         </div>
 
-        <div class="field">
-          <span>Portable package</span>
-          <textarea id="package-output" rows="14" readonly placeholder="Mint a flow to export the portable package."></textarea>
-        </div>
+        <details class="compact-details">
+          <summary>Show handoff package</summary>
+          <div class="field details-body">
+            <textarea id="package-output" rows="12" readonly placeholder="Mint a flow to export the handoff package."></textarea>
+          </div>
+        </details>
       </section>
 
       <section class="panel">
         <div class="panel-header compact-header">
           <h2>2. Finalize</h2>
-        </div>
-
-        <div class="field">
-          <span>Portable package JSON</span>
-          <textarea id="finalize-package-input" rows="10" placeholder="Paste portable package JSON here."></textarea>
         </div>
 
         <div class="field">

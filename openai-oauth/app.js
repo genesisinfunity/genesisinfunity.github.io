@@ -6,7 +6,6 @@ const codeVerifierEl = document.getElementById('code-verifier');
 const packageOutput = document.getElementById('package-output');
 const copyLinkBtn = document.getElementById('copy-link-btn');
 const copyPackageBtn = document.getElementById('copy-package-btn');
-const finalizePackageInput = document.getElementById('finalize-package-input');
 const callbackUrlInput = document.getElementById('callback-url-input');
 const finalizeBtn = document.getElementById('finalize-btn');
 const copyHandoffBtn = document.getElementById('copy-handoff-btn');
@@ -110,23 +109,13 @@ function resetFinalizeOutput() {
   copyHandoffBtn.disabled = true;
 }
 
-function parseJson(text) {
-  return JSON.parse(text);
-}
-
-function safeDecodeURIComponent(value) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
-
 function parseCallbackUrl(raw) {
-  const url = new URL(raw.trim());
+  const value = raw.trim();
+  if (!value) throw new Error('Paste the localhost callback URL first.');
+  const url = new URL(value);
   const query = Object.fromEntries(url.searchParams.entries());
   return {
-    raw: raw.trim(),
+    raw: value,
     origin: url.origin,
     path: url.pathname,
     code: query.code || null,
@@ -139,22 +128,45 @@ function parseCallbackUrl(raw) {
 function minutesBetween(isoA, isoB) {
   const a = new Date(isoA).getTime();
   const b = new Date(isoB).getTime();
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   return Math.max(0, Math.round((b - a) / 60000));
 }
 
 function formatAge(minutes) {
+  if (minutes === null) return 'unknown';
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
 }
 
+function buildCurrentPackage() {
+  if (latestPackage) return latestPackage;
+  const stateHint = stateHintEl.value.trim();
+  const codeVerifier = codeVerifierEl.value.trim();
+  if (!stateHint || !codeVerifier) {
+    throw new Error('Mint first so this page has a state hint and code verifier to validate against.');
+  }
+  return {
+    version: 3,
+    kind: 'openai-oauth-portable-flow',
+    sourceLane: 'genesis-web',
+    requestedBy: 'user',
+    mintedAt: null,
+    oauthUrl: oauthUrlEl.value.trim() || null,
+    stateHint,
+    codeVerifier,
+    redirectUri: REDIRECT_URI,
+    clientId: CLIENT_ID,
+  };
+}
+
 function buildHandoff(pkg, callback) {
-  const ageMinutes = minutesBetween(pkg.mintedAt, new Date().toISOString());
+  const ageMinutes = pkg.mintedAt ? minutesBetween(pkg.mintedAt, new Date().toISOString()) : null;
   const hasCode = Boolean(callback.code);
   const stateMatches = callback.state === pkg.stateHint;
   const hasExpectedOrigin = callback.origin === 'http://localhost:1455';
-  const softStale = ageMinutes > SOFT_STALE_MINUTES;
+  const softStale = ageMinutes !== null && ageMinutes > SOFT_STALE_MINUTES;
 
   let validation = 'valid';
   if (!hasCode) validation = 'missing_code';
@@ -217,6 +229,7 @@ function buildHandoff(pkg, callback) {
 mintButton.addEventListener('click', async () => {
   mintButton.disabled = true;
   resetMintOutput();
+  resetFinalizeOutput();
   setStatus('Minting locally…');
   try {
     latestPackage = await mintPortablePackage();
@@ -224,7 +237,6 @@ mintButton.addEventListener('click', async () => {
     stateHintEl.value = latestPackage.stateHint;
     codeVerifierEl.value = latestPackage.codeVerifier;
     packageOutput.value = JSON.stringify(latestPackage, null, 2);
-    finalizePackageInput.value = packageOutput.value;
     copyLinkBtn.disabled = false;
     copyPackageBtn.disabled = false;
     setStatus('Mint ready.', 'success');
@@ -241,8 +253,8 @@ finalizeBtn.addEventListener('click', async () => {
   finalizeBtn.disabled = true;
   setStatus('Validating callback locally…');
   try {
-    const pkg = parseJson(finalizePackageInput.value.trim());
-    const callback = parseCallbackUrl(callbackUrlInput.value.trim());
+    const pkg = buildCurrentPackage();
+    const callback = parseCallbackUrl(callbackUrlInput.value);
     const result = buildHandoff(pkg, callback);
     latestHandoff = result.normalized;
     callbackStateEl.value = result.summary.callbackState;
@@ -270,7 +282,7 @@ copyLinkBtn.addEventListener('click', async () => {
 copyPackageBtn.addEventListener('click', async () => {
   if (!packageOutput.value) return;
   await copyText(packageOutput.value);
-  setStatus('Package copied.', 'success');
+  setStatus('Handoff package copied.', 'success');
 });
 
 copyHandoffBtn.addEventListener('click', async () => {

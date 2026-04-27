@@ -138,6 +138,21 @@ button:disabled {
   opacity: 0.65;
 }
 
+.compact-details {
+  border-top: 1px solid rgba(47, 59, 99, 0.65);
+  padding-top: 12px;
+}
+
+.compact-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.details-body {
+  margin-top: 10px;
+}
+
 .inline-link {
   color: var(--accent-2);
   text-decoration: none;
