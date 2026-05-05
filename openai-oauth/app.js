@@ -57,6 +57,17 @@ function base64urlDecodeJson(seg) {
   return JSON.parse(atob(padded.replace(/-/g, '+').replace(/_/g, '/')));
 }
 
+function getOauthTokenExpiresAt(tokenResponse) {
+  if (tokenResponse.access_token) {
+    const accessPayload = base64urlDecodeJson(tokenResponse.access_token.split('.')[1]);
+    if (accessPayload.exp) return new Date(accessPayload.exp * 1000).toISOString();
+  }
+  if (tokenResponse.expires_in) {
+    return new Date(Date.now() + Number(tokenResponse.expires_in) * 1000).toISOString();
+  }
+  return null;
+}
+
 function pemToArrayBuffer(pem) {
   const body = pem.replace(/-----BEGIN PUBLIC KEY-----/, '').replace(/-----END PUBLIC KEY-----/, '').replace(/\s+/g, '');
   const binary = atob(body);
@@ -240,6 +251,7 @@ async function buildDurablePayload(target, pkg, callback, validation, tokenRespo
   const authClaims = idPayload['https://api.openai.com/auth'] || {};
   const email = idPayload.email || null;
   const accountId = authClaims.chatgpt_account_id || null;
+  const oauthTokenExpiresAt = getOauthTokenExpiresAt(tokenResponse);
   const encryptedTokens = await encryptString(JSON.stringify({
     access_token: tokenResponse.access_token,
     refresh_token: tokenResponse.refresh_token,
@@ -255,6 +267,7 @@ async function buildDurablePayload(target, pkg, callback, validation, tokenRespo
       type: 'codex',
       disabled: false,
       expired: false,
+      oauth_token_expires_at: oauthTokenExpiresAt,
       tokens_enc: encryptedTokens,
     };
   }
@@ -266,6 +279,7 @@ async function buildDurablePayload(target, pkg, callback, validation, tokenRespo
     mode: 'oauth',
     account_id: accountId,
     email,
+    oauth_token_expires_at: oauthTokenExpiresAt,
     tokens_enc: encryptedTokens,
   };
 }
